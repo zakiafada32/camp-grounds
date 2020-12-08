@@ -1,5 +1,6 @@
 const Campground = require('../models/campground');
 const { cloudinary } = require('../cloudinary');
+const convertNumber = require('../utils/convertNumber');
 
 const mbxGeocoding = require('@mapbox/mapbox-sdk/services/geocoding');
 const mapBoxToken = process.env.MAPBOX_TOKEN;
@@ -30,7 +31,6 @@ module.exports.createCampground = async (req, res, next) => {
   }));
   campground.author = req.user._id;
   await campground.save();
-  console.log(campground);
   req.flash('success', 'Successfully made a new campground!');
   res.redirect(`/campgrounds/${campground._id}`);
 };
@@ -48,6 +48,7 @@ module.exports.showCampground = async (req, res) => {
     req.flash('error', 'Cannot find that campground!');
     return res.redirect('/campgrounds');
   }
+  campground.price = convertNumber(campground.price);
   res.render('campgrounds/show', { campground });
 };
 
@@ -63,7 +64,6 @@ module.exports.renderEditForm = async (req, res) => {
 
 module.exports.updateCampground = async (req, res) => {
   const { id } = req.params;
-  console.log(req.body);
   const campground = await Campground.findByIdAndUpdate(id, {
     ...req.body.campground,
   });
@@ -84,7 +84,12 @@ module.exports.updateCampground = async (req, res) => {
 
 module.exports.deleteCampground = async (req, res) => {
   const { id } = req.params;
-  await Campground.findByIdAndDelete(id);
+  const deleteCampground = await Campground.findByIdAndDelete(id);
+  if (deleteCampground.images.length) {
+    for (let image of deleteCampground.images) {
+      await cloudinary.uploader.destroy(image.filename);
+    }
+  }
   req.flash('success', 'Successfully deleted campground');
   res.redirect('/campgrounds');
 };
